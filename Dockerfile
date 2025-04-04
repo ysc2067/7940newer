@@ -13,5 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application code
 COPY . .
 
+EXPOSE 8000
+
 # Run the chatbot when the container launches
-CMD ["python", "chatbot.py"]
+CMD ["sh", "-c", "python3 chatbot.py & python3 -m http.server 8000"]
