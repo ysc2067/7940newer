@@ -5,8 +5,23 @@ import logging
 import os
 import firebase_db
 from ChatGPT_HKBU import HKBU_ChatGPT
+from flask import Flask
+import threading
 
-# Global instances
+health_app = Flask(__name__)
+
+@health_app.route("/")
+def home():
+    return "Bot is alive!"
+
+
+def run_healthcheck():
+    port = int(os.environ.get("PORT", 8080))
+    health_app.run(host="0.0.0.0", port=port)
+
+health_thread = threading.Thread(target=run_healthcheck)
+health_thread.start()
+
 global chatgpt, firebase_instance
 
 
