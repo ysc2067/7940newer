@@ -3,7 +3,7 @@ from telegram import Update
 import configparser
 import logging
 import os
-import firebase_db
+import supabase_db
 from ChatGPT_HKBU import HKBU_ChatGPT
 from flask import Flask
 import threading
@@ -84,6 +84,19 @@ def help_command(update: Update, context: CallbackContext) -> None:
                               '/match - Find users with similar interests\n'
                               '/recommend <interest> - Get event recommendations for an interest')
 
+def clear_interest(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
+    interest = firebase_instance.get_user_interest(user_id)
+
+    if not interest:
+        update.message.reply_text("You have not set any interest yet.")
+        return
+
+    success = firebase_instance.clear_user_interest(user_id)
+    if success:
+        update.message.reply_text("Your interest has been cleared.")
+    else:
+        update.message.reply_text("Failed to clear your interest. Please try again later.")
 
 def hello(update: Update, context: CallbackContext):
     if context.args:
@@ -113,7 +126,7 @@ def main():
 
     # Initialize Firebase instance
     global firebase_instance
-    firebase_instance = firebase_db.FirebaseDB(config)
+    firebase_instance = supabase_db.SupabaseDB()
 
     # Register handlers
     dispatcher.add_handler(MessageHandler(Filters.text & (~Filters.command), equipped_chatgpt))
@@ -122,6 +135,7 @@ def main():
     dispatcher.add_handler(CommandHandler("setinterest", set_interest))
     dispatcher.add_handler(CommandHandler("match", match))
     dispatcher.add_handler(CommandHandler("recommend", recommend))
+    dispatcher.add_handler(CommandHandler("clearinterest", clear_interest))
 
     # Start the bot
     updater.start_polling()
