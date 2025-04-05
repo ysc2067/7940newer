@@ -35,10 +35,21 @@ def equipped_chatgpt(update, context):
 
 def set_interest(update: Update, context: CallbackContext) -> None:
     if context.args:
-        interest = ' '.join(context.args)
+        new_interest = ' '.join(context.args).strip()
         user_id = update.message.from_user.id
-        firebase_instance.set_user_interest(user_id, interest)
-        update.message.reply_text(f"Your interest '{interest}' has been saved.")
+
+        # Check existing interest
+        old_interest = firebase_instance.get_user_interest(user_id)
+
+        if old_interest:
+            firebase_instance.clear_user_interest(user_id)
+            firebase_instance.set_user_interest(user_id, new_interest)
+            update.message.reply_text(
+                f"Your interest '{new_interest}' has replaced your previous interest '{old_interest}'."
+            )
+        else:
+            firebase_instance.set_user_interest(user_id, new_interest)
+            update.message.reply_text(f"Your interest '{new_interest}' has been saved.")
     else:
         update.message.reply_text("Usage: /setinterest <your interest>")
 

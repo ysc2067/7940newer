@@ -7,9 +7,19 @@ class SupabaseDB:
         key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsbGt6cXhtZG1scW11YW9oZ2RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM4NTY0MzIsImV4cCI6MjA1OTQzMjQzMn0.wEp4BFqZgPdhfQJAseCs3PHLa8KDv-mofZZRqG0Uq0A"
         self.client: Client = create_client(url, key)
 
-    def set_user_interest(self, user_id, interest):
-        data = {"user_id": str(user_id), "interest": interest}
-        self.client.table("users").upsert(data).execute()
+    def set_user_interest(self, user_id, new_interest):
+        response = self.client.table("users").select("interest").eq("user_id", user_id).execute()
+
+        if response.data:
+            old_interest = response.data[0]['interest']
+
+            self.client.table("users").delete().eq("user_id", user_id).execute()
+            self.client.table("users").insert({"user_id": user_id, "interest": new_interest}).execute()
+
+            return f"Your interest '{new_interest}' has replaced your previous interest '{old_interest}'."
+        else:
+            self.client.table("users").insert({"user_id": user_id, "interest": new_interest}).execute()
+            return f"Your interest '{new_interest}' has been saved."
 
     def get_user_interest(self, user_id):
         res = self.client.table("users").select("interest").eq("user_id", str(user_id)).execute()
