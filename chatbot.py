@@ -58,22 +58,29 @@ def match(update: Update, context: CallbackContext) -> None:
         update.message.reply_text("No matching users found at the moment.")
 
 
-def recommend(update: Update, context: CallbackContext) -> None:
-    if context.args:
-        interest = ' '.join(context.args)
-    else:
-        interest = None
+def recommend(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
 
-    recommendations = {
-        "online gaming": "Check out the upcoming tournament on GameZone!",
-        "virtual reality": "Join the VR experience meetup at VirtualHub.",
-        "social media": "Don't miss the social media trends webinar on SocialConnect."
-    }
-    if interest and interest.lower() in recommendations:
-        update.message.reply_text(f"Recommendation for {interest}: {recommendations[interest.lower()]}")
+    if context.args:
+        interest = ' '.join(context.args).strip()
     else:
-        update.message.reply_text(
-            "No recommendations available for that interest. Try 'online gaming', 'virtual reality', or 'social media'.")
+        interest = firebase_instance.get_user_interest(user_id)
+        if not interest:
+            update.message.reply_text("You haven't provided or set any interest yet.")
+            return
+
+    prompt = (
+        f"Please provide a personalized event or activity recommendation for a user "
+        f"who is interested in '{interest}'. Keep it short and friendly."
+    )
+
+    response = chatgpt.submit(prompt)
+
+    if response:
+        update.message.reply_text(f"Here is a recommendation based on '{interest}':\n{response}")
+    else:
+        update.message.reply_text("Sorry, something went wrong while generating the recommendation.")
+
 
 
 def help_command(update: Update, context: CallbackContext) -> None:
