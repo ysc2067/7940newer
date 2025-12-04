@@ -1,34 +1,34 @@
 import configparser
-import requests
+import google.generativeai as genai
 
-class HKBU_ChatGPT():
-    def __init__(self, config_='./config.ini'):
-        if type(config_) == str:
+
+class HKBU_ChatGPT:
+
+    def __init__(self, config_="./config.ini"):
+        if isinstance(config_, str):
             self.config = configparser.ConfigParser()
             self.config.read(config_)
-        elif type(config_) == configparser.ConfigParser:
+        elif isinstance(config_, configparser.ConfigParser):
             self.config = config_
-
-    def submit(self, message):
-        conversation = [{"role": "user", "content": message}]
-        url = (self.config['CHATGPT']['BASICURL']) + \
-              "/deployments/" + (self.config['CHATGPT']['MODELNAME']) + \
-              "/chat/completions/?api-version=" + (self.config['CHATGPT']['APIVERSION'])
-        headers = {
-            'Content-Type': 'application/json',
-            'api-key': (self.config['CHATGPT']['ACCESS_TOKEN'])
-        }
-        payload = {'messages': conversation}
-        response = requests.post(url, json=payload, headers=headers)
-        if response.status_code == 200:
-            data = response.json()
-            return data['choices'][0]['message']['content']
         else:
-            return f"Error: {response.status_code}"
+            raise ValueError("config_ must be a path or ConfigParser object")
 
-if __name__ == '__main__':
-    ChatGPT_test = HKBU_ChatGPT()
+        api_key = self.config["GEMINI"]["API_KEY"]
+        model_name = self.config["GEMINI"].get("MODEL_NAME", "gemini-1.5-flash")
+
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel(model_name)
+
+    def submit(self, message: str) -> str:
+        try:
+            response = self.model.generate_content(message)
+            return response.text
+        except Exception as e:
+            return f"Gemini API error: {e}"
+
+
+if __name__ == "__main__":
+    bot = HKBU_ChatGPT()
     while True:
-        user_input = input('Type something to ChatGPT:\t')
-        response = ChatGPT_test.submit(user_input)
-        print(response)
+        text = input("You: ")
+        print("Bot:", bot.submit(text))
