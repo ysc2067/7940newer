@@ -10,4 +10,4 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["python3", "chatbot.py"]
+CMD ["sh", "-c", "python3 chatbot.py & python3 -m http.server 8000"]
