@@ -1,5 +1,6 @@
 import configparser
 import google.generativeai as genai
+from google import genai
 
 
 class HKBU_ChatGPT:

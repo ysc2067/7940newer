@@ -7,6 +7,7 @@ import supabase_db
 from ChatGPT_HKBU import HKBU_ChatGPT
 from flask import Flask
 import threading
+from google import genai
 
 health_app = Flask(__name__)
 
