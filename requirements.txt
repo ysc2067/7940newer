@@ -6,3 +6,4 @@ python-dotenv==0.20.0
 requests
 flask
 google-generativeai
+google-genai
