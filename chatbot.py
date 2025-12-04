@@ -1,37 +1,37 @@
-import logging
 import configparser
-from flask import Flask, request
+import logging
+from flask import Flask
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 from ChatGPT_HKBU import HKBU_ChatGPT
-from telegram.ext import Updater, MessageHandler, Filters
-import telegram
 
 config = configparser.ConfigParser()
-config.read("./config.ini")
+config.read("config.ini")
 
 telegram_token = config["TELEGRAM"]["TELEGRAM_TOKEN"].strip()
-chatgpt = HKBU_ChatGPT(config)
+gemini_api_key = config["GEMINI"]["GEMINI_API_KEY"].strip()
+
+chatgpt = HKBU_ChatGPT(gemini_api_key)
+
+logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
 
-@app.route("/health")
-def health():
-    return "OK"
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Bot started！")
 
-def reply(update, context):
-    try:
-        text = update.message.text
-        resp = chatgpt.submit(text)
-        update.message.reply_text(resp)
-    except Exception as e:
-        update.message.reply_text(str(e))
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_text = update.message.text
+    reply = chatgpt.chat(user_text)
+    await update.message.reply_text(reply)
 
 def main():
-    updater = Updater(telegram_token, use_context=True)
-    dp = updater.dispatcher
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, reply))
-    updater.start_polling()
-    updater.idle()
+    application = ApplicationBuilder().token(telegram_token).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    application.run_polling()
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     main()
