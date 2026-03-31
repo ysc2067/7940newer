@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 from ChatGPT_HKBU import HKBU_ChatGPT
 from flask import Flask
+from waitress import serve
 import threading
 
 # In-memory conversation history: {user_id: [messages]}
@@ -21,7 +22,7 @@ def home():
 
 def run_healthcheck():
     port = int(os.environ.get("PORT", 8080))
-    health_app.run(host="0.0.0.0", port=port)
+    serve(health_app, host="0.0.0.0", port=port)
 
 
 health_thread = threading.Thread(target=run_healthcheck)
