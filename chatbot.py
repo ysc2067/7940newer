@@ -1,16 +1,20 @@
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
-from telegram import Update
 import logging
 import os
-from dotenv import load_dotenv
-from ai_client import AIClient
-from flask import Flask
-from waitress import serve
 import threading
+
+from dotenv import load_dotenv
+from flask import Flask
+from telegram import Update
+from telegram.ext import CallbackContext, CommandHandler, Filters, MessageHandler, Updater
+from waitress import serve
+
+from ai_client import AIClient
+
 
 # In-memory conversation history: {user_id: [messages]}
 user_context: dict[int, list[dict]] = {}
 MAX_HISTORY = 20  # keep last 20 messages (10 turns) per user
+TELEGRAM_MESSAGE_CHUNK_SIZE = 4000  # Telegram limit is 4096; leave room for safety.
 
 health_app = Flask(__name__)
 
@@ -22,21 +26,35 @@ def home():
 
 def run_healthcheck() -> None:
     port = int(os.environ.get("PORT", 8080))
+    logging.info("Starting healthcheck server on port %s", port)
     serve(health_app, host="0.0.0.0", port=port)
 
 
 chatgpt: AIClient | None = None
 
 
+def send_telegram_message(bot, chat_id: int, text: str) -> None:
+    if not text:
+        text = "AI 服务暂时没有返回内容。"
+
+    for start in range(0, len(text), TELEGRAM_MESSAGE_CHUNK_SIZE):
+        bot.send_message(chat_id=chat_id, text=text[start:start + TELEGRAM_MESSAGE_CHUNK_SIZE])
+
+
 def equipped_chatgpt(update: Update, context: CallbackContext) -> None:
     global chatgpt
+
+    if update.effective_chat is None or update.effective_user is None or update.message is None:
+        logging.warning("Received an incomplete Telegram update: %s", update)
+        return
+
     if chatgpt is None:
         logging.error("ChatGPT instance not initialized")
-        context.bot.send_message(chat_id=update.effective_chat.id, text="服务暂时不可用，请稍后重试。")
+        send_telegram_message(context.bot, update.effective_chat.id, "服务暂时不可用，请稍后重试。")
         return
 
     user_id = update.effective_user.id
-    user_msg = update.message.text
+    user_msg = update.message.text or ""
 
     # Get or create conversation history for this user
     if user_id not in user_context:
@@ -54,7 +72,7 @@ def equipped_chatgpt(update: Update, context: CallbackContext) -> None:
 
     logging.info("User %s: %s", user_id, user_msg)
     logging.info("Reply: %s", reply_message[:200])
-    context.bot.send_message(chat_id=update.effective_chat.id, text=reply_message)
+    send_telegram_message(context.bot, update.effective_chat.id, reply_message)
 
 
 def recommend(update: Update, context: CallbackContext) -> None:
@@ -97,23 +115,24 @@ def main() -> None:
     # Setup logging
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-    # Start healthcheck after loading env
-    health_thread = threading.Thread(target=run_healthcheck)
-    health_thread.start()
-
-    # Initialize Telegram bot updater
+    # Validate required config before starting background services.
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not token:
         raise ValueError("TELEGRAM_BOT_TOKEN is not set in .env or environment variables.")
 
+    # Initialize ChatGPT instance (config from .env)
+    global chatgpt
+    chatgpt = AIClient()
+
+    # Start healthcheck after loading env
+    health_thread = threading.Thread(target=run_healthcheck, name="healthcheck", daemon=True)
+    health_thread.start()
+
+    # Initialize Telegram bot updater
     proxy_url = os.environ.get("PROXY_URL")
     request_kwargs = {"proxy_url": proxy_url} if proxy_url else {}
     updater = Updater(token=token, use_context=True, request_kwargs=request_kwargs)
     dispatcher = updater.dispatcher
-
-    # Initialize ChatGPT instance (config from .env)
-    global chatgpt
-    chatgpt = AIClient()
 
     # Register handlers
     dispatcher.add_handler(MessageHandler(Filters.text & (~Filters.command), equipped_chatgpt))
